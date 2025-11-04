@@ -1,0 +1,1654 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-R">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Gestion RH & Indemnités - Calcul Automatique</title>
+    <meta name="description" content="Système professionnel de gestion des employés et calcul automatique des indemnités - Location forfaitaire et prime de rendement">
+    
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css" integrity="sha512-SnH5WK+bZxgPHs44uWIX+LLJAJ9/2PkPKZ5QiAj6Ta86w+fsb2TkcmfRyVX3pBnMFcV7oQPJkl9QevSCWr3W6A==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    
+    <style>
+        /* ... [Le CSS reste inchangé] ... */
+        :root {
+            --primary-color: #2563eb;
+            --primary-hover: #1d4ed8;
+            --secondary-color: #64748b;
+            --secondary-hover: #475569;
+            --success-color: #16a34a;
+            --success-hover: #15803d;
+            --danger-color: #dc2626;
+            --danger-hover: #b91c1c;
+            --warning-color: #f59e0b;
+            --answer-color: #8b5cf6;
+            --answer-hover: #7c3aed;
+            --sidebar-bg: #1e293b;
+            --sidebar-text: #cbd5e1;
+            --sidebar-hover-bg: #334155;
+            --sidebar-active-bg: #2563eb;
+            --body-bg: #f1f5f9;
+            --card-bg: #ffffff;
+            --text-color: #334155;
+            --text-light: #64748b;
+            --border-color: #e2e8f0;
+            --input-border: #cbd5e1;
+            --input-focus: #2563eb;
+            --font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            --shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+            --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+        }
+
+        *, *::before, *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: var(--font-family);
+            background-color: var(--body-bg);
+            color: var(--text-color);
+            line-height: 1.6;
+            font-size: 16px;
+        }
+
+        /* Layout */
+        .main-header {
+            padding: 1rem 1.5rem;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background-color: var(--card-bg);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 900;
+        }
+
+        .content-section {
+            padding: 1.5rem;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        .content-section.hidden {
+            display: none;
+        }
+
+        /* General Components */
+        .page-title {
+            font-size: 1.75rem;
+            font-weight: 800;
+            color: var(--text-color);
+        }
+
+        .card {
+            background-color: var(--card-bg);
+            border-radius: 0.5rem;
+            box-shadow: var(--shadow);
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+        }
+
+        .btn {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 0.5rem;
+            padding: 0.625rem 1.25rem;
+            border: none;
+            border-radius: 0.375rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, opacity 0.2s;
+            text-decoration: none;
+            color: white;
+            font-size: 0.95rem;
+        }
+        
+        .btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        
+        .btn-primary { background-color: var(--primary-color); }
+        .btn-primary:hover:not(:disabled) { background-color: var(--primary-hover); }
+        .btn-secondary { background-color: var(--secondary-color); color: white; }
+        .btn-secondary:hover:not(:disabled) { background-color: var(--secondary-hover); }
+        .btn-success { background-color: var(--success-color); }
+        .btn-success:hover:not(:disabled) { background-color: var(--success-hover); }
+        .btn-danger { background-color: var(--danger-color); }
+        .btn-danger:hover:not(:disabled) { background-color: var(--danger-hover); }
+        .btn-answer { background-color: var(--answer-color); }
+        .btn-answer:hover:not(:disabled) { background-color: var(--answer-hover); }
+        .btn-sm {
+            padding: 0.25rem 0.5rem;
+            font-size: 0.8rem;
+        }
+
+        /* Toast (Notification) */
+        .toast {
+            position: fixed;
+            top: -100px;
+            left: 50%;
+            transform: translateX(-50%);
+            padding: 1rem 1.5rem;
+            border-radius: 0.5rem;
+            color: white;
+            font-weight: 600;
+            box-shadow: var(--shadow-lg);
+            z-index: 10000;
+            min-width: 300px;
+            text-align: center;
+            transition: top 0.4s ease-in-out;
+        }
+        
+        .toast.show {
+            top: 2rem;
+        }
+        
+        .toast.success { background-color: var(--success-color); }
+        .toast.error { background-color: var(--danger-color); }
+        .toast.warning { background-color: var(--warning-color); }
+
+        /* Forms */
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+            gap: 1.5rem;
+            margin-bottom: 1rem;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+        }
+
+        .form-group label {
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: var(--text-color);
+            font-size: 0.875rem;
+        }
+
+        .form-group label.required::after {
+            content: ' *';
+            color: var(--danger-color);
+        }
+
+        .form-group input,
+        .form-group select,
+        .form-group input[type="file"] {
+            width: 100%;
+            padding: 0.625rem 0.75rem;
+            border: 1px solid var(--input-border);
+            border-radius: 0.375rem;
+            font-size: 1rem;
+            transition: border-color 0.2s, box-shadow 0.2s;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+        }
+
+        .form-group input[type="file"] {
+            padding: 0.5rem 0.75rem;
+            line-height: 1.5;
+        }
+
+        .form-group input:focus,
+        .form-group select:focus {
+            outline: none;
+            border-color: var(--input-focus);
+            box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+        }
+
+        .form-actions {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1.5rem;
+        }
+
+        /* Tabs */
+        .tabs {
+            border-bottom: 1px solid var(--border-color);
+            margin-bottom: 1.5rem;
+            display: flex;
+            gap: 1.5rem;
+        }
+
+        .tab-link {
+            padding: 0.5rem 0.25rem;
+            margin-bottom: -1px;
+            font-weight: 600;
+            color: var(--text-light);
+            background: none;
+            border: none;
+            border-bottom: 2px solid transparent;
+            cursor: pointer;
+            transition: color 0.2s, border-color 0.2s;
+            font-size: 1rem;
+        }
+
+        .tab-link:hover {
+            color: var(--text-color);
+        }
+
+        .tab-link.active {
+            color: var(--primary-color);
+            border-bottom-color: var(--primary-color);
+        }
+
+        .tab-content { display: none; }
+        .tab-content.active { display: block; }
+        
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+
+        /* Tables */
+        .table-container {
+            overflow-x: auto;
+            margin: 1.5rem 0;
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            background: var(--card-bg);
+        }
+
+        thead {
+            background: var(--body-bg);
+        }
+
+        th {
+            padding: 12px 15px;
+            text-align: left;
+            font-weight: 600;
+            color: var(--text-light);
+            border-bottom: 2px solid var(--border-color);
+            font-size: 0.875rem;
+            text-transform: uppercase;
+        }
+
+        td {
+            padding: 12px 15px;
+            border-bottom: 1px solid var(--border-color);
+            color: var(--text-color);
+        }
+        
+        tbody tr:last-child td {
+            border-bottom: none;
+        }
+
+        tbody tr:hover {
+            background: var(--body-bg);
+            cursor: pointer;
+        }
+
+        /* Grades Grid */
+        .grades-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+            gap: 1rem;
+        }
+
+        .grade-item {
+            padding: 1.5rem;
+            background: var(--body-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 0.375rem;
+            text-align: center;
+            transition: transform 0.2s, box-shadow 0.2s;
+        }
+        
+        .grade-item:hover {
+            transform: translateY(-2px);
+            box-shadow: var(--shadow);
+        }
+
+        .grade-item .grade-name {
+            font-weight: 600;
+            font-size: 1.1rem;
+            margin-bottom: 8px;
+            color: var(--text-color);
+        }
+
+        .grade-item .grade-amount {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        /* Total Box */
+        .total-box {
+            background: #eff6ff;
+            border: 1px solid var(--primary-color);
+            border-radius: 0.375rem;
+            padding: 1.5rem;
+            margin-top: 1.5rem;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .total-box span {
+            font-size: 1.1rem;
+            color: var(--text-color);
+            font-weight: 500;
+        }
+
+        .total-box strong {
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: var(--primary-color);
+        }
+
+        /* Budget Info */
+        .budget-info {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+            padding: 1.5rem;
+            background: var(--body-bg);
+            border-radius: 0.375rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .info-item {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .info-item span {
+            color: var(--text-light);
+            font-size: 0.9rem;
+        }
+
+        .info-item strong {
+            font-size: 1.3rem;
+            color: var(--primary-color);
+            font-weight: 700;
+        }
+
+        /* Modal Styles */
+        .modal {
+            display: none;
+            position: fixed;
+            z-index: 1000;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+            overflow: auto;
+            background-color: rgba(0,0,0,0.5);
+        }
+
+        .modal-content {
+            background-color: var(--card-bg);
+            margin: 5% auto;
+            padding: 20px;
+            border: 1px solid var(--border-color);
+            border-radius: 0.5rem;
+            width: 80%;
+            max-width: 700px;
+            box-shadow: var(--shadow-lg);
+        }
+
+        .close {
+            color: var(--text-light);
+            float: right;
+            font-size: 28px;
+            font-weight: bold;
+            cursor: pointer;
+        }
+        
+        /* MODIFICATION: Style pour l'icône Font Awesome */
+        .close i {
+            font-size: 1.5rem;
+            font-weight: normal;
+        }
+
+
+        .close:hover {
+            color: var(--danger-color);
+        }
+
+        /* Filter Styles */
+        .filter-section {
+            background-color: var(--body-bg);
+            border-radius: 0.5rem;
+            padding: 1rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid var(--border-color);
+        }
+
+        .filter-title {
+            font-weight: 600;
+            margin-bottom: 1rem;
+            color: var(--text-color);
+        }
+
+        .filter-actions {
+            display: flex;
+            justify-content: flex-end;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+
+        /* Responsive */
+        @media (max-width: 768px) {
+            .main-header {
+                flex-direction: column;
+                gap: 1rem;
+                text-align: center;
+            }
+
+            .page-title {
+                font-size: 1.5rem;
+            }
+
+            .tabs {
+                flex-direction: column;
+                gap: 0.5rem;
+            }
+
+            .form-grid {
+                grid-template-columns: 1fr;
+            }
+
+            .grades-grid {
+                grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+            }
+
+            .budget-info {
+                grid-template-columns: 1fr;
+            }
+            
+            .modal-content {
+                width: 95%;
+                margin: 10% auto;
+            }
+        }
+    </style>
+</head>
+<body>
+    
+    <header class="main-header">
+        <h1 class="page-title">Gestion RH & Indemnités</h1>
+        <div class="file-actions">
+            <button id="loadFile" class="btn btn-secondary"><i class="fa-solid fa-folder-open"></i> Charger Fichier</button>
+        </div>
+    </header>
+
+    <div class="content-section">
+        <nav class="tabs">
+            <button class="tab-link active" data-tab="employees">Gestion Employés</button>
+            <button class="tab-link" data-tab="location">Location Forfaitaire</button>
+            <button class="tab-link" data-tab="prime">Prime de Rendement</button>
+        </nav>
+
+        <section id="employees-tab" class="tab-content active">
+            <div class="section-header">
+                <h2>Gestion des Employés</h2>
+                <button id="addEmployeeBtn" class="btn btn-primary"><i class="fa-solid fa-user-plus"></i> Ajouter Employé</button>
+            </div>
+
+            <div id="employeeFormCard" class="card" style="display: none;">
+                <h3 id="formTitle">Nouveau Employé</h3>
+                <form id="employeeForm">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label class="required">Matricule</label>
+                            <input type="text" id="matricule" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="required">Nom</label>
+                            <input type="text" id="nom" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Type Employé</label>
+                            <input type="text" id="typeEmployee">
+                        </div>
+                        <div class="form-group">
+                            <label class="required">Grade</label>
+                            <input type="text" id="grade" required>
+                        </div>
+                        <div class="form-group">
+                            <label class="required">Date Rejoindre (YYYY-MM-DD)</label>
+                            <input type="date" id="dateRejoindre" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Date Partie (YYYY-MM-DD)</label>
+                            <input type="date" id="datePartie">
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Sauvegarder</button>
+                        <button type="button" id="cancelForm" class="btn btn-secondary">Annuler</button>
+                    </div>
+                </form>
+            </div>
+
+            <div class="card">
+                <h3>Filtres Avancés</h3>
+                <div class="filter-section">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Matricule</label>
+                            <input type="text" id="filterMatricule" placeholder="Rechercher par matricule">
+                        </div>
+                        <div class="form-group">
+                            <label>Nom</label>
+                            <input type="text" id="filterNom" placeholder="Rechercher par nom">
+                        </div>
+                        <div class="form-group">
+                            <label>Type Employé</label>
+                            <select id="filterType">
+                                <option value="">Tous</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Grade</label>
+                            <select id="filterGrade">
+                                <option value="">Tous</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Statut</label>
+                            <select id="filterStatus">
+                                <option value="">Tous</option>
+                                <option value="active">Actif</option>
+                                <option value="left">Parti</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="filter-actions">
+                        <button id="resetFilters" class="btn btn-secondary">Réinitialiser</button>
+                        <button id="applyFilters" class="btn btn-primary">Appliquer</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Mise à Jour par Fichier (Excel)</h3>
+                <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;">
+                    Format attendu : Fichier Excel avec 2 colonnes (ex: `Matricule,Valeur`), sans en-tête.
+                </p>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Champ à Mettre à Jour</label>
+                        <select id="fileBulkField">
+                            <option value="">Sélectionner...</option>
+                            <option value="nom">Nom</option>
+                            <option value="typeEmployee">Type Employé</option>
+                            <option value="grade">Grade</option>
+                            <option value="dateRejoindre">Date Rejoindre</option>
+                            <option value="datePartie">Date Partie</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Fichier Excel (.xlsx)</label>
+                        <input type="file" id="fileBulkInput" accept=".xlsx" style="padding: 0.5rem 0.75rem; line-height: 1.5;">
+                    </div>
+                    <div class="form-group" style="align-self: flex-end;">
+                        <button id="fileBulkUpdateBtn" class="btn btn-primary"><i class="fa-regular fa-square-plus"></i>Lancer la Mise à Jour</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Liste des Employés</h3>
+                <div class="table-container">
+                    <table id="employeesTable">
+                        <thead>
+                            <tr>
+                                <th>Matricule</th>
+                                <th>Nom</th>
+                                <th>Type</th>
+                                <th>Grade</th>
+                                <th>Date Rejoindre</th>
+                                <th>Date Partie</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <section id="location-tab" class="tab-content">
+            <div class="section-header">
+                <h2>Location Forfaitaire</h2>
+                <button id="addGradeBtn" class="btn btn-primary"><i class="fa-solid fa-plus"></i>Ajouter Grade</button>
+            </div>
+
+            <div id="addGradeForm" class="card" style="display: none;">
+                <h3>Nouveau Grade</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Grade</label>
+                        <input type="text" id="gradeNom">
+                    </div>
+                    <div class="form-group">
+                        <label>Montant Annuel (DH)</label>
+                        <input type="number" id="gradeMontant">
+                    </div>
+                    <div class="form-group" style="align-self: flex-end;">
+                        <button id="addGradeSubmit" class="btn btn-primary">Ajouter</button>
+                        <button id="cancelGrade" class="btn btn-secondary">Annuler</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
+                <h3>Grilles de Grades</h3>
+                <div id="gradesGrid" class="grades-grid"></div>
+            </div>
+
+            <div class="card">
+                <div class="section-header">
+                    <h3>Calcul des Locations</h3>
+                    <button id="calculateLocation" class="btn btn-secondary"><i class="fa-regular fa-circle-check"></i> Calculer</button>
+                </div>
+                <div id="locationResults" style="display: none;">
+                    <div class="table-container">
+                        <table id="locationTable">
+                            <thead>
+                                <tr>
+                                    <th>Matricule</th>
+                                    <th>Nom</th>
+                                    <th>Grade</th>
+                                    <th>Date Rejoindre</th>
+                                    <th>Date Partie</th>
+                                    <th>Montant (DH)</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="total-box">
+                        <span>Total Location Forfaitaire:</span>
+                        <strong id="locationTotal">0 DH</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section id="prime-tab" class="tab-content">
+            <h2>Prime de Rendement</h2>
+
+            <div class="card">
+                <h3>Mise à Jour par Fichier Excel</h3>
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label>Type de Mise à Jour</label>
+                        <select id="updateType">
+                            <option value="salary">Salaires</option>
+                            <option value="notation">Notations</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label id="fileLabel">Fichier Excel (.xlsx)</label>
+                        <input type="file" id="primeFileInput" accept=".xlsx" style="padding: 0.5rem 0.75rem; line-height: 1.5;">
+                    </div>
+                    <div class="form-group" style="align-self: flex-end;">
+                        <button id="updatePrimeFileBtn" class="btn btn-primary"><i class="fa-regular fa-square-plus"></i> Lancer la Mise à Jour</button>
+                    </div>
+                </div>
+                <p id="fileFormatText" style="font-size: 0.9rem; color: var(--text-light); margin-top: 1rem;">
+                    Format attendu : Fichier Excel avec 2 colonnes (Matricule, Salaire), sans en-tête.
+                </p>
+            </div>
+
+            <div class="card">
+                <div class="section-header">
+                    <h3>Calcul des Primes</h3>
+                    <button id="calculatePrime" class="btn btn-secondary"><i class="fa-regular fa-circle-check"></i> Calculer</button>
+                </div>
+                <div id="primeResults" style="display: none;">
+                    <div class="budget-info">
+                        <div class="info-item">
+                            <span>Budget (12%):</span>
+                            <strong id="budgetAmount">0 DH</strong>
+                        </div>
+                        <div class="info-item">
+                            <span>Somme Primes:</span>
+                            <strong id="primeSum">0 DH</strong>
+                        </div>
+                        <div class="info-item">
+                            <span>Facteur d'Ajustement:</span>
+                            <strong id="adjustmentFactor">1.00</strong>
+                        </div>
+                    </div>
+                    <div class="table-container">
+                        <table id="primeTable">
+                            <thead>
+                                <tr>
+                                    <th>Matricule</th>
+                                    <th>Nom</th>
+                                    <th>Salaire Brut</th>
+                                    <th>Notation (%)</th>
+                                    <th>Prime Initiale</th>
+                                    <th>Prime Ajustée</th>
+                                </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <div class="total-box">
+                        <span>Total Primes Ajustées:</span>
+                        <strong id="primeTotal">0 DH</strong>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </div> 
+    
+    <div id="editEmployeeModal" class="modal">
+        <div class="modal-content">
+            <span class="close"><i class="fa-solid fa-times"></i></span>
+            <h2>Modifier Employé</h2>
+            <form id="editEmployeeForm">
+                <div class="form-grid">
+                    <div class="form-group">
+                        <label class="required">Matricule</label>
+                        <input type="text" id="editMatricule" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Nom</label>
+                        <input type="text" id="editNom" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Type Employé</label>
+                        <input type="text" id="editTypeEmployee">
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Grade</label>
+                        <input type="text" id="editGrade" required>
+                    </div>
+                    <div class="form-group">
+                        <label class="required">Date Rejoindre (YYYY-MM-DD)</label>
+                        <input type="date" id="editDateRejoindre" required>
+                    </div>
+                    <div class="form-group">
+                        <label>Date Partie (YYYY-MM-DD)</label>
+                        <input type="date" id="editDatePartie">
+                    </div>
+                </div>
+                <div class="form-actions">
+                    <button type="submit" class="btn btn-primary"><i class="fa-solid fa-save"></i> Enregistrer</button>
+                    <button type="button" id="cancelEdit" class="btn btn-secondary">Annuler</button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <div id="toast" class="toast"></div>
+
+    <script>
+        // État global de l'application
+        let appData = {
+            employees: [],
+            gradeAmounts: [],
+            salaries: {},
+            notations: {}
+        };
+        
+        let editingEmployeeMatricule = null;
+        let fileHandle = null;
+
+        // ==================== UTILITAIRES ====================
+
+        function showToast(message, type = 'success') {
+            const toast = document.getElementById('toast');
+            toast.textContent = message;
+            toast.className = `toast show ${type}`;
+            
+            setTimeout(() => {
+                toast.classList.remove('show');
+            }, 3000);
+        }
+
+        function formatNumber(num) {
+            return num.toLocaleString('fr-FR');
+        }
+        
+        // ==================== GESTION DE LA PERSISTANCE (File System Access API) ====================
+        
+        async function saveAppDataToFile() {
+            if (!fileHandle) {
+                console.warn('Mode non-persistant. Aucune sauvegarde automatique.');
+                return;
+            }
+            
+            try {
+                const writableStream = await fileHandle.createWritable();
+                const dataStr = JSON.stringify(appData, null, 2);
+                await writableStream.write(dataStr);
+                await writableStream.close();
+                console.log('Données sauvegardées automatiquement.');
+            } catch (error) {
+                console.error('Erreur lors de la sauvegarde automatique:', error);
+                showToast('Échec de la sauvegarde automatique des données', 'error');
+            }
+        }
+
+        async function promptForFile() {
+            if (!window.showOpenFilePicker) {
+                showToast('API Fichier non supportée. Lancez via localhost ou HTTPS.', 'error');
+                return false;
+            }
+
+            try {
+                [fileHandle] = await window.showOpenFilePicker({
+                    types: [{ 
+                        description: 'Fichiers JSON', 
+                        accept: { 'application/json': ['.json'] } 
+                    }],
+                    multiple: false
+                });
+
+                const file = await fileHandle.getFile();
+                const data = await file.text();
+                
+                if (data.trim()) {
+                    appData = JSON.parse(data);
+                    showToast(`Données chargées depuis ${fileHandle.name}`, 'success');
+                } else {
+                    appData = { employees: [], gradeAmounts: [], salaries: {}, notations: {} };
+                    showToast(`Fichier vide (${fileHandle.name}) sélectionné.`, 'warning');
+                }
+                
+                // MODIFICATION: Icône Font Awesome
+                document.getElementById('loadFile').innerHTML = `<i class="fa-solid fa-link"></i> Connecté: ${fileHandle.name}`;
+                
+                return true;
+
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    showToast('Chargement annulé. L\'application démarre sans sauvegarde.', 'warning');
+                } else {
+                    console.error('Erreur lors du chargement du fichier:', error);
+                    showToast('Une erreur s\'est produite lors du chargement.', 'error');
+                }
+                fileHandle = null;
+                // MODIFICATION: Icône Font Awesome
+                document.getElementById('loadFile').innerHTML = `<i class="fa-solid fa-folder-open"></i> Charger Fichier`;
+                return false;
+            }
+        }
+
+
+        // ==================== CALCULS (Inchangé) ====================
+
+        function calculatePeriod(dateRejoindre, datePartie) {
+            const startDate = new Date(dateRejoindre);
+            const endDate = datePartie ? new Date(datePartie) : new Date();
+            
+            const startMonth = startDate.getMonth() + 1;
+            const startDay = startDate.getDate();
+            const endMonth = endDate.getMonth() + 1;
+            const endDay = endDate.getDate();
+            
+            let monthDiff = endMonth - startMonth;
+            if (monthDiff < 0) {
+                monthDiff += 12;
+            }
+            
+            const dayDiff = endDay - startDay;
+            
+            return (monthDiff * 30) + dayDiff;
+        }
+
+        function calculateLocationForfaitaire(employee, gradeAmounts) {
+            const grade = gradeAmounts.find(g => g.grade === employee.grade);
+            if (!grade) return 0;
+            
+            const period = calculatePeriod(employee.dateRejoindre, employee.datePartie);
+            return (grade.montant / 360) * period;
+        }
+
+        function calculatePeriodSemestre(employee) {
+            const startDate = new Date(employee.dateRejoindre);
+            const currentYear = new Date().getFullYear();
+            const semestreEnd = new Date(currentYear, 5, 30); // 30 juin
+            
+            const endDate = employee.datePartie 
+                ? new Date(employee.datePartie) 
+                : (new Date() < semestreEnd ? new Date() : semestreEnd);
+            
+            const startMonth = startDate.getMonth() + 1;
+            const startDay = startDate.getDate();
+            const endMonth = endDate.getMonth() + 1;
+            const endDay = endDate.getDate();
+            
+            let monthDiff = endMonth - startMonth;
+            if (monthDiff < 0) {
+                monthDiff += 12;
+            }
+            
+            const dayDiff = endDay - startDay;
+            
+            return (monthDiff * 30) + dayDiff;
+        }
+
+        function calculateBudget(employees, salaries) {
+            let totalSalaryPeriod = 0;
+            
+            employees.forEach(emp => {
+                const salary = salaries[emp.matricule] || 0;
+                const period = calculatePeriodSemestre(emp);
+                const salaryForPeriod = (salary / 30) * period;
+                totalSalaryPeriod += salaryForPeriod;
+            });
+            
+            return totalSalaryPeriod * 0.12;
+        }
+
+        function calculatePrime(employee, salary, notation) {
+            return salary * (notation / 100);
+        }
+
+        function calculatePrimesWithAdjustment(employees, salaries, notations) {
+            const budget = calculateBudget(employees, salaries);
+            
+            const results = employees.map(emp => {
+                const salary = salaries[emp.matricule] || 0;
+                const notation = notations[emp.matricule] || 0;
+                const primeInitiale = calculatePrime(emp, salary, notation);
+                
+                return {
+                    employee: emp,
+                    salary,
+                    notation,
+                    primeInitiale,
+                    primeAjustee: primeInitiale
+                };
+            });
+            
+            const totalPrimes = results.reduce((sum, r) => sum + r.primeInitiale, 0);
+            const adjustmentFactor = totalPrimes > budget ? budget / totalPrimes : 1;
+            
+            results.forEach(r => {
+                r.primeAjustee = r.primeInitiale * adjustmentFactor;
+            });
+            
+            return {
+                results,
+                budget,
+                totalPrimes,
+                adjustmentFactor
+            };
+        }
+
+        // ==================== GESTION DES ONGLETS (Inchangé) ====================
+
+        function initTabs() {
+            const tabBtns = document.querySelectorAll('.tab-link');
+            const tabContents = document.querySelectorAll('.tab-content');
+            
+            tabBtns.forEach(btn => {
+                btn.addEventListener('click', () => {
+                    const tabName = btn.dataset.tab;
+                    
+                    tabBtns.forEach(b => b.classList.remove('active'));
+                    tabContents.forEach(c => c.classList.remove('active'));
+                    
+                    btn.classList.add('active');
+                    document.getElementById(`${tabName}-tab`).classList.add('active');
+                });
+            });
+        }
+
+        // ==================== PARTIE 1: GESTION EMPLOYÉS ====================
+
+        function renderEmployeesTable(employees = appData.employees) {
+            const tbody = document.querySelector('#employeesTable tbody');
+            tbody.innerHTML = '';
+            
+            if (employees.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" style="text-align: center; color: var(--text-light);">Aucun employé trouvé</td></tr>';
+                return;
+            }
+            
+            employees.forEach(emp => {
+                const row = document.createElement('tr');
+                // MODIFICATION: Icônes Font Awesome pour les actions
+                row.innerHTML = `
+                    <td>${emp.matricule}</td>
+                    <td>${emp.nom}</td>
+                    <td>${emp.typeEmployee || '-'}</td>
+                    <td>${emp.grade}</td>
+                    <td>${emp.dateRejoindre}</td>
+                    <td>${emp.datePartie || 'En cours'}</td>
+                    <td>
+                        <button class="btn btn-primary btn-sm" onclick="editEmployee('${emp.matricule}')"><i class="fa-solid fa-pencil"></i></button>
+                        <button class="btn btn-danger btn-sm" onclick="deleteEmployee('${emp.matricule}')"><i class="fa-solid fa-trash"></i></button>
+                    </td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        function addEmployee(employeeData) {
+            const exists = appData.employees.find(e => e.matricule === employeeData.matricule);
+            if (exists) {
+                showToast('Matricule déjà existant', 'error');
+                return;
+            }
+            appData.employees.push(employeeData);
+            renderEmployeesTable();
+            updateFilterOptions();
+            showToast('Employé ajouté avec succès', 'success');
+            saveAppDataToFile();
+        }
+
+        function deleteEmployee(matricule) {
+            if (confirm('Êtes-vous sûr de vouloir supprimer cet employé ?')) {
+                appData.employees = appData.employees.filter(e => e.matricule !== matricule);
+                renderEmployeesTable();
+                updateFilterOptions();
+                showToast('Employé supprimé', 'success');
+                saveAppDataToFile();
+            }
+        }
+
+        function editEmployee(matricule) {
+            const employee = appData.employees.find(e => e.matricule === matricule);
+            if (!employee) {
+                showToast('Employé non trouvé', 'error');
+                return;
+            }
+            
+            // Affiche le formulaire modal au lieu du formulaire en ligne
+            editingEmployeeMatricule = matricule;
+            document.getElementById('editMatricule').value = employee.matricule;
+            document.getElementById('editNom').value = employee.nom;
+            document.getElementById('editTypeEmployee').value = employee.typeEmployee || '';
+            document.getElementById('editGrade').value = employee.grade;
+            document.getElementById('editDateRejoindre').value = employee.dateRejoindre;
+            document.getElementById('editDatePartie').value = employee.datePartie || '';
+            
+            document.getElementById('editEmployeeModal').style.display = 'block';
+        }
+
+        function updateEmployee(employeeData) {
+            // Logique de mise à jour (utilisée par le modal)
+            const index = appData.employees.findIndex(e => e.matricule === editingEmployeeMatricule);
+            if (index === -1) {
+                showToast('Employé non trouvé', 'error');
+                return;
+            }
+            
+            appData.employees[index] = employeeData;
+            renderEmployeesTable();
+            updateFilterOptions();
+            showToast('Employé mis à jour avec succès', 'success');
+            saveAppDataToFile();
+            
+            // Réinitialiser et cacher le formulaire principal
+            editingEmployeeMatricule = null;
+            document.getElementById('employeeFormCard').style.display = 'none';
+            document.getElementById('employeeForm').reset();
+        }
+        
+        /**
+         * MODIFICATION: Nouvelle fonction pour lire les données Excel (via SheetJS)
+         * @param {ArrayBuffer} data - Le contenu binaire du fichier
+         * @param {string} field - Le champ de 'appData.employees' à mettre à jour
+         */
+        function processExcelData(data, field) {
+            try {
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                // Convertit la feuille en tableau de tableaux (ex: [ ["M1001", "Nouveau Nom"], ... ])
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+
+                let updatedCount = 0;
+                let skippedCount = 0;
+
+                for (const row of rows) {
+                    if (!row || row.length < 2) {
+                        skippedCount++;
+                        continue;
+                    }
+                    const matricule = String(row[0]).trim();
+                    const value = String(row[1]).trim();
+
+                    if (!matricule) {
+                        skippedCount++;
+                        continue;
+                    }
+                    
+                    const employee = appData.employees.find(e => e.matricule === matricule);
+                    if (employee) {
+                        employee[field] = value;
+                        updatedCount++;
+                    } else {
+                        console.warn(`Matricule non trouvé: ${matricule}`);
+                        skippedCount++;
+                    }
+                }
+                renderEmployeesTable();
+                showToast(`${updatedCount} employé(e)s mis à jour. ${skippedCount} lignes ignorées.`, 'success');
+                saveAppDataToFile();
+            } catch (error) {
+                console.error('Erreur lors du parsing Excel:', error);
+                showToast('Erreur lors du traitement du fichier Excel.', 'error');
+            }
+        }
+
+        /**
+         * MODIFICATION: Nouvelle fonction pour lire les données Excel de Prime (via SheetJS)
+         * @param {ArrayBuffer} data - Le contenu binaire du fichier
+         * @param {string} type - 'salary' ou 'notation'
+         */
+        function processPrimeExcelData(data, type) {
+            try {
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                
+                let updatedCount = 0;
+                let skippedCount = 0;
+
+                for (const row of rows) {
+                        if (!row || row.length < 2) {
+                        skippedCount++;
+                        continue;
+                    }
+                    const matricule = String(row[0]).trim();
+                    const value = parseFloat(String(row[1]).replace(',', '.').trim()); // Gère les nombres
+
+                    if (!matricule) {
+                        skippedCount++;
+                        continue;
+                    }
+
+                    const employee = appData.employees.find(e => e.matricule === matricule);
+                    
+                    if (employee && !isNaN(value)) {
+                        if (type === 'salary') {
+                            appData.salaries[matricule] = value;
+                        } else if (type === 'notation') {
+                            if (value >= 0 && value <= 100) {
+                                appData.notations[matricule] = value;
+                            } else {
+                                console.warn(`Notation invalide: ${value}`);
+                                skippedCount++;
+                                continue;
+                            }
+                        }
+                        updatedCount++;
+                    } else {
+                        console.warn(`Matricule non trouvé ou valeur invalide: ${matricule} (valeur: ${String(row[1])})`);
+                        skippedCount++;
+                    }
+                }
+                
+                const typeText = type === 'salary' ? 'salaires' : 'notations';
+                showToast(`${updatedCount} ${typeText} mis à jour. ${skippedCount} lignes ignorées.`, 'success');
+                saveAppDataToFile();
+            } catch (error) {
+                console.error('Erreur lors du parsing Excel:', error);
+                showToast('Erreur lors du traitement du fichier Excel.', 'error');
+            }
+        }
+        
+        // MODIFICATION: Les anciennes fonctions `processExcelUpdate` et `processPrimeExcelUpdate` ont été supprimées.
+
+        function updateFilterOptions() {
+            // ... (Code inchangé)
+            const gradeFilter = document.getElementById('filterGrade');
+            const currentGradeValue = gradeFilter.value;
+            gradeFilter.innerHTML = '<option value="">Tous</option>';
+            const uniqueGrades = [...new Set(appData.employees.map(emp => emp.grade))];
+            uniqueGrades.forEach(grade => {
+                const option = document.createElement('option');
+                option.value = grade;
+                option.textContent = grade;
+                gradeFilter.appendChild(option);
+            });
+            if (uniqueGrades.includes(currentGradeValue)) {
+                gradeFilter.value = currentGradeValue;
+            }
+            
+            const typeFilter = document.getElementById('filterType');
+            const currentTypeValue = typeFilter.value;
+            typeFilter.innerHTML = '<option value="">Tous</option>';
+            const uniqueTypes = [...new Set(appData.employees.map(emp => emp.typeEmployee).filter(Boolean))];
+            uniqueTypes.forEach(type => {
+                const option = document.createElement('option');
+                option.value = type;
+                option.textContent = type;
+                typeFilter.appendChild(option);
+            });
+            if (uniqueTypes.includes(currentTypeValue)) {
+                typeFilter.value = currentTypeValue;
+            }
+        }
+
+        function applyFilters() {
+            // ... (Code inchangé)
+            const matriculeFilter = document.getElementById('filterMatricule').value.toLowerCase();
+            const nomFilter = document.getElementById('filterNom').value.toLowerCase();
+            const gradeFilter = document.getElementById('filterGrade').value;
+            const typeFilter = document.getElementById('filterType').value;
+            const statusFilter = document.getElementById('filterStatus').value;
+            
+            let filteredEmployees = [...appData.employees];
+            
+            if (matriculeFilter) {
+                filteredEmployees = filteredEmployees.filter(emp => emp.matricule.toLowerCase().includes(matriculeFilter));
+            }
+            if (nomFilter) {
+                filteredEmployees = filteredEmployees.filter(emp => emp.nom.toLowerCase().includes(nomFilter));
+            }
+            if (gradeFilter) {
+                filteredEmployees = filteredEmployees.filter(emp => emp.grade === gradeFilter);
+            }
+            if (typeFilter) {
+                filteredEmployees = filteredEmployees.filter(emp => emp.typeEmployee === typeFilter);
+            }
+            if (statusFilter) {
+                if (statusFilter === 'active') {
+                    filteredEmployees = filteredEmployees.filter(emp => !emp.datePartie);
+                } else if (statusFilter === 'left') {
+                    filteredEmployees = filteredEmployees.filter(emp => emp.datePartie);
+                }
+            }
+            
+            renderEmployeesTable(filteredEmployees);
+            showToast(`${filteredEmployees.length} employé(s) trouvé(s)`, 'success');
+        }
+
+        function resetFilters() {
+            // ... (Code inchangé)
+            document.getElementById('filterMatricule').value = '';
+            document.getElementById('filterNom').value = '';
+            document.getElementById('filterGrade').value = '';
+            document.getElementById('filterType').value = '';
+            document.getElementById('filterStatus').value = '';
+            renderEmployeesTable();
+            showToast('Filtres réinitialisés', 'success');
+        }
+
+        function initEmployeesSection() {
+            const addBtn = document.getElementById('addEmployeeBtn');
+            const form = document.getElementById('employeeForm');
+            const cancelBtn = document.getElementById('cancelForm');
+            const fileBulkUpdateBtn = document.getElementById('fileBulkUpdateBtn');
+            const applyFiltersBtn = document.getElementById('applyFilters');
+            const resetFiltersBtn = document.getElementById('resetFilters');
+            
+            addBtn.addEventListener('click', () => {
+                // Gère le formulaire principal (pas le modal)
+                editingEmployeeMatricule = null;
+                form.reset();
+                document.getElementById('formTitle').textContent = 'Nouveau Employé';
+                document.getElementById('employeeFormCard').style.display = 'block';
+            });
+            
+            cancelBtn.addEventListener('click', () => {
+                document.getElementById('employeeFormCard').style.display = 'none';
+                form.reset();
+                editingEmployeeMatricule = null;
+            });
+            
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const employeeData = {
+                    matricule: document.getElementById('matricule').value.trim(),
+                    nom: document.getElementById('nom').value.trim(),
+                    typeEmployee: document.getElementById('typeEmployee').value.trim(),
+                    grade: document.getElementById('grade').value.trim(),
+                    dateRejoindre: document.getElementById('dateRejoindre').value,
+                    datePartie: document.getElementById('datePartie').value || null
+                };
+                
+                // Utilise le formulaire principal pour AJOUTER
+                // (L'édition se fait via le modal)
+                if (editingEmployeeMatricule) {
+                     // Au cas où, mais l'édition est gérée par le modal
+                    updateEmployee(employeeData);
+                } else {
+                    addEmployee(employeeData);
+                }
+                
+                form.reset();
+                document.getElementById('employeeFormCard').style.display = 'none';
+            });
+
+            // MODIFICATION: Mise à jour pour utiliser SheetJS
+            fileBulkUpdateBtn.addEventListener('click', () => {
+                const field = document.getElementById('fileBulkField').value;
+                const fileInput = document.getElementById('fileBulkInput');
+                const file = fileInput.files[0];
+
+                if (!field || !file) {
+                    showToast('Veuillez sélectionner un champ et un fichier Excel.', 'error');
+                    return;
+                }
+                if (!file.name.endsWith('.xlsx')) {
+                    showToast('Veuillez sélectionner un fichier Excel valide (.xlsx).', 'error');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const fileContent = e.target.result; // C'est un ArrayBuffer
+                    processExcelData(fileContent, field); // Appelle la nouvelle fonction
+                    fileInput.value = '';
+                };
+                reader.onerror = () => {
+                    showToast('Erreur lors de la lecture du fichier.', 'error');
+                };
+                // MODIFICATION: Lire en ArrayBuffer au lieu de Text
+                reader.readAsArrayBuffer(file);
+            });
+            
+            applyFiltersBtn.addEventListener('click', applyFilters);
+            resetFiltersBtn.addEventListener('click', resetFilters);
+            
+            renderEmployeesTable();
+            updateFilterOptions();
+        }
+
+        // ==================== PARTIE 2: LOCATION FORFAITAIRE ====================
+
+        function renderGradesGrid() {
+            // ... (Code inchangé)
+            const grid = document.getElementById('gradesGrid');
+            grid.innerHTML = '';
+            
+            if (appData.gradeAmounts.length === 0) {
+                grid.innerHTML = '<p style="color: var(--text-light);">Aucun grade ajouté</p>';
+                return;
+            }
+            
+            appData.gradeAmounts.forEach(grade => {
+                const item = document.createElement('div');
+                item.className = 'grade-item';
+                item.innerHTML = `
+                    <div class="grade-name">${grade.grade}</div>
+                    <div class="grade-amount">${formatNumber(grade.montant)} DH</div>
+                `;
+                grid.appendChild(item);
+            });
+        }
+
+        function addGrade() {
+            // ... (Code inchangé)
+            const gradeNom = document.getElementById('gradeNom').value.trim();
+            const gradeMontant = parseFloat(document.getElementById('gradeMontant').value);
+            
+            if (!gradeNom || isNaN(gradeMontant)) {
+                showToast('Grade et montant valides requis', 'error');
+                return;
+            }
+            
+            const exists = appData.gradeAmounts.find(g => g.grade === gradeNom);
+            if (exists) {
+                showToast('Grade déjà existant', 'error');
+                return;
+            }
+            
+            appData.gradeAmounts.push({ grade: gradeNom, montant: gradeMontant });
+            renderGradesGrid();
+            updateFilterOptions();
+            showToast('Grade ajouté avec succès', 'success');
+            saveAppDataToFile();
+            
+            document.getElementById('gradeNom').value = '';
+            document.getElementById('gradeMontant').value = '';
+            document.getElementById('addGradeForm').style.display = 'none';
+        }
+
+        function calculateLocationResults() {
+            // ... (Code inchangé)
+            if (appData.employees.length === 0) {
+                showToast('Aucun employé disponible', 'warning');
+                return;
+            }
+            if (appData.gradeAmounts.length === 0) {
+                showToast('Aucun grade défini', 'warning');
+                return;
+            }
+            
+            const tbody = document.querySelector('#locationTable tbody');
+            tbody.innerHTML = '';
+            let total = 0;
+            
+            appData.employees.forEach(emp => {
+                const montant = calculateLocationForfaitaire(emp, appData.gradeAmounts);
+                total += montant;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${emp.matricule}</td>
+                    <td>${emp.nom}</td>
+                    <td>${emp.grade}</td>
+                    <td>${emp.dateRejoindre}</td>
+                    <td>${emp.datePartie || 'En cours'}</td>
+                    <td style="font-weight: 600; color: var(--success-color);">${formatNumber(Math.round(montant))} DH</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('locationTotal').textContent = `${formatNumber(Math.round(total))} DH`;
+            document.getElementById('locationResults').style.display = 'block';
+            showToast('Calculs effectués', 'success');
+        }
+
+        function initLocationSection() {
+            // ... (Code inchangé)
+            const addGradeBtn = document.getElementById('addGradeBtn');
+            const addGradeSubmit = document.getElementById('addGradeSubmit');
+            const cancelGrade = document.getElementById('cancelGrade');
+            const calculateBtn = document.getElementById('calculateLocation');
+            
+            addGradeBtn.addEventListener('click', () => {
+                document.getElementById('addGradeForm').style.display = 'block';
+            });
+            
+            cancelGrade.addEventListener('click', () => {
+                document.getElementById('addGradeForm').style.display = 'none';
+                document.getElementById('gradeNom').value = '';
+                document.getElementById('gradeMontant').value = '';
+            });
+            
+            addGradeSubmit.addEventListener('click', addGrade);
+            calculateBtn.addEventListener('click', calculateLocationResults);
+            
+            renderGradesGrid();
+        }
+
+        // ==================== PARTIE 3: PRIME DE RENDEMENT ====================
+
+        function calculatePrimeResults() {
+            // ... (Code inchangé)
+            if (appData.employees.length === 0) {
+                showToast('Aucun employé disponible', 'warning');
+                return;
+            }
+            
+            const calculation = calculatePrimesWithAdjustment(
+                appData.employees,
+                appData.salaries,
+                appData.notations
+            );
+            
+            document.getElementById('budgetAmount').textContent = `${formatNumber(Math.round(calculation.budget))} DH`;
+            document.getElementById('primeSum').textContent = `${formatNumber(Math.round(calculation.totalPrimes))} DH`;
+            document.getElementById('adjustmentFactor').textContent = calculation.adjustmentFactor.toFixed(4);
+            
+            const tbody = document.querySelector('#primeTable tbody');
+            tbody.innerHTML = '';
+            let totalAdjusted = 0;
+            
+            calculation.results.forEach(result => {
+                totalAdjusted += result.primeAjustee;
+                
+                const row = document.createElement('tr');
+                row.innerHTML = `
+                    <td>${result.employee.matricule}</td>
+                    <td>${result.employee.nom}</td>
+                    <td>${formatNumber(Math.round(result.salary))} DH</td>
+                    <td>${result.notation.toFixed(2)}%</td>
+                    <td>${formatNumber(Math.round(result.primeInitiale))} DH</td>
+                    <td style="font-weight: 600; color: var(--success-color);">${formatNumber(Math.round(result.primeAjustee))} DH</td>
+                `;
+                tbody.appendChild(row);
+            });
+            
+            document.getElementById('primeTotal').textContent = `${formatNumber(Math.round(totalAdjusted))} DH`;
+            document.getElementById('primeResults').style.display = 'block';
+            showToast('Calculs effectués', 'success');
+        }
+
+        function updatePrimeFileFormat() {
+            // ... (Code inchangé)
+            const updateType = document.getElementById('updateType').value;
+            const fileFormatText = document.getElementById('fileFormatText');
+            
+            if (updateType === 'salary') {
+                fileFormatText.textContent = 'Format attendu : Fichier Excel avec 2 colonnes (Matricule, Salaire), sans en-tête.';
+            } else {
+                fileFormatText.textContent = 'Format attendu : Fichier Excel avec 2 colonnes (Matricule, Notation), sans en-tête.';
+            }
+        }
+
+        function initPrimeSection() {
+            const updateTypeSelect = document.getElementById('updateType');
+            const updatePrimeFileBtn = document.getElementById('updatePrimeFileBtn');
+            const calculateBtn = document.getElementById('calculatePrime');
+            
+            updateTypeSelect.addEventListener('change', updatePrimeFileFormat);
+            
+            // MODIFICATION: Mise à jour pour utiliser SheetJS
+            updatePrimeFileBtn.addEventListener('click', () => {
+                const updateType = document.getElementById('updateType').value;
+                const fileInput = document.getElementById('primeFileInput');
+                const file = fileInput.files[0];
+
+                if (!file) {
+                    showToast('Veuillez sélectionner un fichier Excel.', 'error');
+                    return;
+                }
+                if (!file.name.endsWith('.xlsx')) {
+                    showToast('Veuillez sélectionner un fichier Excel valide (.xlsx).', 'error');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const fileContent = e.target.result; // C'est un ArrayBuffer
+                    processPrimeExcelData(fileContent, updateType); // Appelle la nouvelle fonction
+                    fileInput.value = '';
+                };
+                reader.onerror = () => {
+                    showToast('Erreur lors de la lecture du fichier.', 'error');
+                };
+                // MODIFICATION: Lire en ArrayBuffer au lieu de Text
+                reader.readAsArrayBuffer(file);
+            });
+            
+            calculateBtn.addEventListener('click', calculatePrimeResults);
+        }
+
+        // ==================== MODAL EMPLOYÉ ====================
+
+        function initEmployeeModal() {
+            const modal = document.getElementById('editEmployeeModal');
+            const span = document.getElementsByClassName('close')[0];
+            const cancelBtn = document.getElementById('cancelEdit');
+            const form = document.getElementById('editEmployeeForm');
+            
+            span.onclick = function() {
+                modal.style.display = 'none';
+            }
+            cancelBtn.onclick = function() {
+                modal.style.display = 'none';
+            }
+            window.onclick = function(event) {
+                if (event.target == modal) {
+                    modal.style.display = 'none';
+                }
+            }
+            
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                
+                const employeeData = {
+                    matricule: document.getElementById('editMatricule').value.trim(),
+                    nom: document.getElementById('editNom').value.trim(),
+                    typeEmployee: document.getElementById('editTypeEmployee').value.trim(),
+                    grade: document.getElementById('editGrade').value.trim(),
+                    dateRejoindre: document.getElementById('editDateRejoindre').value,
+                    datePartie: document.getElementById('editDatePartie').value || null
+                };
+                
+                // Assure-toi que editingEmployeeMatricule est bien défini
+                if (editingEmployeeMatricule) {
+                     updateEmployee(employeeData);
+                }
+               
+                modal.style.display = 'none';
+            });
+        }
+
+        // ==================== RAFRAÎCHIR TOUTES LES VUES ====================
+
+        function refreshAllViews() {
+            renderEmployeesTable();
+            updateFilterOptions();
+            renderGradesGrid();
+            document.getElementById('locationResults').style.display = 'none';
+            document.getElementById('primeResults').style.display = 'none';
+        }
+
+        // ==================== INITIALISATION ====================
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            initTabs();
+            initEmployeesSection();
+            initLocationSection();
+            initPrimeSection();
+            initEmployeeModal();
+
+            document.getElementById('loadFile').addEventListener('click', async () => {
+                const fileLoaded = await promptForFile();
+                if (fileLoaded) {
+                    refreshAllViews();
+                }
+            });
+            
+            // Tente de charger un fichier au démarrage
+            const fileLoaded = await promptForFile();
+            
+            if (fileLoaded) {
+                refreshAllViews();
+            } else {
+                // Démarrage sans persistance
+                appData = { employees: [], gradeAmounts: [], salaries: {}, notations: {} };
+                refreshAllViews();
+            }
+        });
+    </script>
+</body>
+</html>
