@@ -580,9 +580,25 @@
             </div>
 
             <div class="card">
+                <h3>Ajout par Fichier (Excel)</h3>
+                <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;">
+                    Format attendu : Fichier Excel avec des en-têtes. Doit contenir au minimum les colonnes : `matricule`, `nom`, `grade`, `dateRejoindre`.
+                </p>
+                <div class="form-grid" style="grid-template-columns: 2fr 1fr;">
+                    <div class="form-group">
+                        <label>Fichier Excel (.xlsx)</label>
+                        <input type="file" id="fileBulkAddInput" accept=".xlsx" style="padding: 0.5rem 0.75rem; line-height: 1.5;">
+                    </div>
+                    <div class="form-group" style="align-self: flex-end;">
+                        <button id="fileBulkAddBtn" class="btn btn-success"><i class="fa-solid fa-users"></i> Ajouter les Employés</button>
+                    </div>
+                </div>
+            </div>
+
+            <div class="card">
                 <h3>Mise à Jour par Fichier (Excel)</h3>
                 <p style="font-size: 0.9rem; color: var(--text-light); margin-bottom: 1rem;">
-                    Format attendu : Fichier Excel avec 2 colonnes (ex: `Matricule,Valeur`), sans en-tête.
+                    Format attendu : Fichier Excel avec des en-têtes. Le fichier doit contenir une colonne "matricule" et une colonne correspondant au champ à mettre à jour (ex: "nom", "grade").
                 </p>
                 <div class="form-grid">
                     <div class="form-group">
@@ -707,7 +723,7 @@
                     </div>
                 </div>
                 <p id="fileFormatText" style="font-size: 0.9rem; color: var(--text-light); margin-top: 1rem;">
-                    Format attendu : Fichier Excel avec 2 colonnes (Matricule, Salaire), sans en-tête.
+                    Format attendu : Fichier Excel avec des en-têtes. Le fichier doit contenir une colonne "matricule" et une colonne "salaire" ou "notation".
                 </p>
             </div>
 
@@ -1114,23 +1130,36 @@
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                // Convertit la feuille en tableau de tableaux (ex: [ ["M1001", "Nouveau Nom"], ... ])
-                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                if (jsonData.length === 0) {
+                    showToast("Le fichier Excel est vide.", "warning");
+                    return;
+                }
+
+                const headers = Object.keys(jsonData[0]);
+                const matriculeHeader = headers.find(h => h.toLowerCase().trim() === 'matricule');
+                const fieldHeader = headers.find(h => h.toLowerCase().trim() === field.toLowerCase());
+
+                if (!matriculeHeader) {
+                    showToast("La colonne 'matricule' est introuvable dans le fichier Excel.", 'error');
+                    return;
+                }
+                if (!fieldHeader) {
+                    showToast(`La colonne '${field}' est introuvable dans le fichier Excel.`, 'error');
+                    return;
+                }
 
                 let updatedCount = 0;
                 let skippedCount = 0;
 
-                for (const row of rows) {
-                    if (!row || row.length < 2) {
-                        skippedCount++;
-                        continue;
-                    }
-                    const matricule = String(row[0]).trim();
-                    const value = String(row[1]).trim();
+                jsonData.forEach(row => {
+                    const matricule = String(row[matriculeHeader]).trim();
+                    const value = String(row[fieldHeader]).trim();
 
                     if (!matricule) {
                         skippedCount++;
-                        continue;
+                        return; 
                     }
                     
                     const employee = appData.employees.find(e => e.matricule === matricule);
@@ -1141,7 +1170,8 @@
                         console.warn(`Matricule non trouvé: ${matricule}`);
                         skippedCount++;
                     }
-                }
+                });
+
                 renderEmployeesTable();
                 showToast(`${updatedCount} employé(e)s mis à jour. ${skippedCount} lignes ignorées.`, 'success');
                 saveAppDataToFile();
@@ -1151,32 +1181,120 @@
             }
         }
 
+
         /**
          * MODIFICATION: Nouvelle fonction pour lire les données Excel de Prime (via SheetJS)
          * @param {ArrayBuffer} data - Le contenu binaire du fichier
          * @param {string} type - 'salary' ou 'notation'
          */
+        function processBulkAddExcelData(data) {
+            try {
+                const workbook = XLSX.read(data, { type: 'array' });
+                const sheetName = workbook.SheetNames[0];
+                const worksheet = workbook.Sheets[sheetName];
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                if (jsonData.length === 0) {
+                    showToast("Le fichier Excel est vide.", "warning");
+                    return;
+                }
+
+                const requiredHeaders = ['matricule', 'nom', 'grade', 'dateRejoindre'];
+                const headers = Object.keys(jsonData[0]).map(h => h.toLowerCase().trim());
+                
+                for (const requiredHeader of requiredHeaders) {
+                    if (!headers.includes(requiredHeader)) {
+                        showToast(`Colonne requise manquante : '${requiredHeader}'`, 'error');
+                        return;
+                    }
+                }
+
+                let addedCount = 0;
+                let skippedCount = 0;
+
+                jsonData.forEach(row => {
+                    const matricule = String(row.matricule || '').trim();
+                    if (!matricule) {
+                        skippedCount++;
+                        return;
+                    }
+
+                    const exists = appData.employees.some(e => e.matricule === matricule);
+                    if (exists) {
+                        console.warn(`Matricule déjà existant, employé ignoré : ${matricule}`);
+                        skippedCount++;
+                        return;
+                    }
+                    
+                    const newEmployee = {
+                        matricule: matricule,
+                        nom: String(row.nom || '').trim(),
+                        grade: String(row.grade || '').trim(),
+                        dateRejoindre: String(row.dateRejoindre || '').trim(),
+                        typeEmployee: String(row.typeEmployee || '').trim() || null,
+                        datePartie: String(row.datePartie || '').trim() || null
+                    };
+
+                    if (!newEmployee.nom || !newEmployee.grade || !newEmployee.dateRejoindre) {
+                         console.warn(`Données incomplètes pour le matricule, employé ignoré : ${matricule}`);
+                         skippedCount++;
+                         return;
+                    }
+
+                    appData.employees.push(newEmployee);
+                    addedCount++;
+                });
+
+                if (addedCount > 0) {
+                    renderEmployeesTable();
+                    updateFilterOptions();
+                    saveAppDataToFile();
+                }
+                showToast(`${addedCount} employé(s) ajouté(s). ${skippedCount} lignes ignorées.`, 'success');
+
+            } catch (error) {
+                console.error('Erreur lors de l\'ajout en masse par Excel:', error);
+                showToast('Erreur lors du traitement du fichier Excel.', 'error');
+            }
+        }
+
         function processPrimeExcelData(data, type) {
             try {
                 const workbook = XLSX.read(data, { type: 'array' });
                 const sheetName = workbook.SheetNames[0];
                 const worksheet = workbook.Sheets[sheetName];
-                const rows = XLSX.utils.sheet_to_json(worksheet, { header: 1, defval: "" });
-                
+                const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+
+                if (jsonData.length === 0) {
+                    showToast("Le fichier Excel est vide.", "warning");
+                    return;
+                }
+
+                const headers = Object.keys(jsonData[0]);
+                const matriculeHeader = headers.find(h => h.toLowerCase().trim() === 'matricule');
+                const valueHeaderName = type === 'salary' ? 'salaire' : 'notation';
+                const valueHeader = headers.find(h => h.toLowerCase().trim() === valueHeaderName);
+
+                if (!matriculeHeader) {
+                    showToast("La colonne 'matricule' est introuvable.", 'error');
+                    return;
+                }
+                if (!valueHeader) {
+                    showToast(`La colonne '${valueHeaderName}' est introuvable.`, 'error');
+                    return;
+                }
+
                 let updatedCount = 0;
                 let skippedCount = 0;
 
-                for (const row of rows) {
-                        if (!row || row.length < 2) {
-                        skippedCount++;
-                        continue;
-                    }
-                    const matricule = String(row[0]).trim();
-                    const value = parseFloat(String(row[1]).replace(',', '.').trim()); // Gère les nombres
+                jsonData.forEach(row => {
+                    const matricule = String(row[matriculeHeader]).trim();
+                    const rawValue = String(row[valueHeader]).replace(',', '.').trim();
+                    const value = parseFloat(rawValue);
 
                     if (!matricule) {
                         skippedCount++;
-                        continue;
+                        return;
                     }
 
                     const employee = appData.employees.find(e => e.matricule === matricule);
@@ -1188,17 +1306,17 @@
                             if (value >= 0 && value <= 100) {
                                 appData.notations[matricule] = value;
                             } else {
-                                console.warn(`Notation invalide: ${value}`);
+                                console.warn(`Notation invalide pour ${matricule}: ${value}`);
                                 skippedCount++;
-                                continue;
+                                return;
                             }
                         }
                         updatedCount++;
                     } else {
-                        console.warn(`Matricule non trouvé ou valeur invalide: ${matricule} (valeur: ${String(row[1])})`);
+                        console.warn(`Matricule non trouvé ou valeur invalide: ${matricule} (valeur: ${rawValue})`);
                         skippedCount++;
                     }
-                }
+                });
                 
                 const typeText = type === 'salary' ? 'salaires' : 'notations';
                 showToast(`${updatedCount} ${typeText} mis à jour. ${skippedCount} lignes ignorées.`, 'success');
@@ -1292,6 +1410,7 @@
             const form = document.getElementById('employeeForm');
             const cancelBtn = document.getElementById('cancelForm');
             const fileBulkUpdateBtn = document.getElementById('fileBulkUpdateBtn');
+            const fileBulkAddBtn = document.getElementById('fileBulkAddBtn');
             const applyFiltersBtn = document.getElementById('applyFilters');
             const resetFiltersBtn = document.getElementById('resetFilters');
             
@@ -1359,6 +1478,31 @@
                     showToast('Erreur lors de la lecture du fichier.', 'error');
                 };
                 // MODIFICATION: Lire en ArrayBuffer au lieu de Text
+                reader.readAsArrayBuffer(file);
+            });
+
+            fileBulkAddBtn.addEventListener('click', () => {
+                const fileInput = document.getElementById('fileBulkAddInput');
+                const file = fileInput.files[0];
+
+                if (!file) {
+                    showToast('Veuillez sélectionner un fichier Excel.', 'error');
+                    return;
+                }
+                if (!file.name.endsWith('.xlsx')) {
+                    showToast('Veuillez sélectionner un fichier Excel valide (.xlsx).', 'error');
+                    return;
+                }
+
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    const fileContent = e.target.result;
+                    processBulkAddExcelData(fileContent);
+                    fileInput.value = '';
+                };
+                reader.onerror = () => {
+                    showToast('Erreur lors de la lecture du fichier.', 'error');
+                };
                 reader.readAsArrayBuffer(file);
             });
             
@@ -1522,15 +1666,11 @@
         }
 
         function updatePrimeFileFormat() {
-            // ... (Code inchangé)
             const updateType = document.getElementById('updateType').value;
             const fileFormatText = document.getElementById('fileFormatText');
+            const fieldName = updateType === 'salary' ? 'salaire' : 'notation';
             
-            if (updateType === 'salary') {
-                fileFormatText.textContent = 'Format attendu : Fichier Excel avec 2 colonnes (Matricule, Salaire), sans en-tête.';
-            } else {
-                fileFormatText.textContent = 'Format attendu : Fichier Excel avec 2 colonnes (Matricule, Notation), sans en-tête.';
-            }
+            fileFormatText.textContent = `Format attendu : Fichier Excel avec des en-têtes. Le fichier doit contenir une colonne "matricule" et une colonne "${fieldName}".`;
         }
 
         function initPrimeSection() {
